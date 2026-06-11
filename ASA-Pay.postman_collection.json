@@ -1,0 +1,167 @@
+{
+  "info": {
+    "name": "ASA Pay - API de Transações POS",
+    "description": "Coleção dos endpoints authorize/confirm/void. A assinatura HMAC-SHA256 (X-Signature) e o X-Timestamp são gerados automaticamente por um Pre-request Script no nível da coleção. Corpos minificados (uma linha) para evitar divergência de quebras de linha na assinatura.\n\nVariáveis:\n- baseUrl: URL da API\n- hmacSecret: deve ser IGUAL ao security.hmac.secret do servidor\n- transactionId: preenchido automaticamente após o Authorize",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "hmacSecret", "value": "dev-secret-troque-em-producao" },
+    { "key": "transactionId", "value": "" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Gera X-Timestamp e X-Signature (HMAC-SHA256) para todo request da coleção.",
+          "const ts = Math.floor(Date.now() / 1000).toString();",
+          "const secret = pm.collectionVariables.get('hmacSecret');",
+          "const method = pm.request.method;",
+          "const path = '/' + pm.request.url.path.join('/');",
+          "const rawBody = (pm.request.body && pm.request.body.raw) ? pm.request.body.raw : '';",
+          "// Resolve {{variaveis}} no corpo para assinar exatamente o que sera enviado.",
+          "const body = pm.variables.replaceIn(rawBody);",
+          "const canonical = ts + '.' + method + '.' + path + '.' + body;",
+          "const sig = CryptoJS.HmacSHA256(canonical, secret).toString(CryptoJS.enc.Hex);",
+          "pm.request.headers.upsert({ key: 'X-Timestamp', value: ts });",
+          "pm.request.headers.upsert({ key: 'X-Signature', value: sig });",
+          "console.log('CANON>>>', JSON.stringify(canonical));",
+          "console.log('SIG>>>', sig);"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authorize",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  const id = pm.response.json().transactionId;",
+              "  pm.collectionVariables.set('transactionId', id);",
+              "  console.log('transactionId salvo:', id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"nsu\":\"123456\",\"amount\":199.90,\"terminalId\":\"T-1000\"}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/pos/transactions/authorize",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "pos", "transactions", "authorize"]
+        },
+        "description": "Autoriza a transação. Retorna 200 com transactionId. Idempotente por (terminalId + nsu)."
+      }
+    },
+    {
+      "name": "2. Confirm",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"transactionId\":\"{{transactionId}}\"}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/pos/transactions/confirm",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "pos", "transactions", "confirm"]
+        },
+        "description": "Confirma a transação (usa o transactionId salvo pelo Authorize). Retorna 204. Repetição é no-op."
+      }
+    },
+    {
+      "name": "3. Void (por transactionId)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"transactionId\":\"{{transactionId}}\"}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/pos/transactions/void",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "pos", "transactions", "void"]
+        },
+        "description": "Desfaz a transação pelo transactionId. Retorna 204. Repetição é no-op."
+      }
+    },
+    {
+      "name": "4. Void (por nsu + terminalId)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"nsu\":\"123456\",\"terminalId\":\"T-1000\"}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/pos/transactions/void",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "pos", "transactions", "void"]
+        },
+        "description": "Desfaz a transação localizando-a por nsu + terminalId. Retorna 204."
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pay-postgres
+    environment:
+      POSTGRES_DB: pay
+      POSTGRES_USER: pay
+      POSTGRES_PASSWORD: pay
+    ports:
+      - "5432:5432"
+    volumes:
+      - pay-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pay -d pay"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Jaeger all-in-one: recebe traces via OTLP e oferece UI em http://localhost:16686
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    container_name: pay-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC (usado pela aplicação)
+      - "4318:4318"     # OTLP HTTP
+
+volumes:
+  pay-pgdata:
