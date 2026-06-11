@@ -307,4 +307,3 @@ com.asa.pay
 - Idempotência da chamada externa em corrida: ver nota na seção de idempotência
   (propagar `Idempotency-Key`).
 - Migrações de schema via Flyway/Liquibase em vez de `ddl-auto=update` em produção.
-```
